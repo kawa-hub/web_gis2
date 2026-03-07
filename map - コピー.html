@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Leaflet Marker Tool</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+<style>
+  #map { height: 600px; }
+  .form-box { margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<h2>Leaflet マーカー入力ツール</h2>
+
+<div id="map"></div>
+
+<div class="form-box">
+  <label>対応状況：
+    <select id="status">
+      <option value="未対応">未対応</option>
+      <option value="対応">対応</option>
+    </select>
+  </label>
+
+  <label>地点名：
+    <input type="text" id="name" value="A">
+  </label>
+
+  <label>備考：
+    <input type="text" id="note" placeholder="任意">
+  </label>
+
+  <button id="saveBtn">保存</button>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<!-- 初期データ（本来は data/data.js に置く内容） -->
+<script>
+var markerData = [
+  {
+    "lat": 38.2688,
+    "lng": 140.8719,
+    "status": "未対応",
+    "name": "A",
+    "note": ""
+  }
+];
+</script>
+
+<script>
+// カスタムアイコン
+const iconOk = L.icon({
+  iconUrl: 'img/ok.png',
+  iconSize: [32, 32]
+});
+
+const iconNg = L.icon({
+  iconUrl: 'img/ng.png',
+  iconSize: [32, 32]
+});
+
+// 地図初期化
+const map = L.map('map').setView([38.2688, 140.8719], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19
+}).addTo(map);
+
+let markers = [];
+
+// 既存データを表示
+function loadMarkers() {
+  markerData.forEach(d => addMarkerToMap(d));
+}
+
+function addMarkerToMap(data) {
+  const icon = data.status === "対応" ? iconOk : iconNg;
+
+  const marker = L.marker([data.lat, data.lng], { icon }).addTo(map);
+
+  marker.data = data;
+
+  marker.bindPopup(`
+    <b>地点名:</b> <input type="text" class="popup-name" value="${data.name}"><br>
+    <b>対応状況:</b>
+      <select class="popup-status">
+        <option value="未対応" ${data.status === "未対応" ? "selected" : ""}>未対応</option>
+        <option value="対応" ${data.status === "対応" ? "selected" : ""}>対応</option>
+      </select><br>
+    <b>備考:</b> <input type="text" class="popup-note" value="${data.note}">
+  `);
+
+  marker.on("popupclose", () => {
+    const popup = marker.getPopup().getElement();
+    marker.data.name = popup.querySelector(".popup-name").value;
+    marker.data.status = popup.querySelector(".popup-status").value;
+    marker.data.note = popup.querySelector(".popup-note").value;
+
+    marker.setIcon(marker.data.status === "対応" ? iconOk : iconNg);
+  });
+
+  markers.push(marker);
+}
+
+// 地図クリックで新規マーカー追加
+map.on("click", (e) => {
+  const newData = {
+    lat: e.latlng.lat,
+    lng: e.latlng.lng,
+    status: document.getElementById("status").value,
+    name: document.getElementById("name").value,
+    note: document.getElementById("note").value
+  };
+
+  addMarkerToMap(newData);
+});
+
+document.getElementById("saveBtn").addEventListener("click", () => {
+  const exportData = markers.map(m => m.data);
+
+  fetch("save.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(exportData)
+  })
+  .then(res => res.text())
+  .then(msg => alert(msg))
+  .catch(err => alert("保存に失敗しました: " + err));
+});
+
+
+</script>
+
+</body>
+</html>
